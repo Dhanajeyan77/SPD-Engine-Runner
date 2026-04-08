@@ -1,0 +1,30 @@
+name: SPD Universal Security Engine
+on:
+  # 1. AUTOMATION: Runs every day at midnight (UTC)
+  schedule:
+    - cron: '0 0 * * *'
+
+  # 2. ON-DEMAND: Triggered by your Flask App button
+  workflow_dispatch:
+    inputs:
+      username:
+        description: 'The SPD User who owns this target'
+        required: true
+        default: 'Dhanajeyan77'
+      target_url:
+        description: 'The specific URL to be audited'
+        required: true
+        default: 'https://juice-shop.herokuapp.com'
+
+jobs:
+  dynamic_audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🛡️ Deploying Stealth Engine
+        run: |
+          # Use the inputs if manual, or use defaults if scheduled
+          USER_NAME=${{ github.event.inputs.username || 'Dhanajeyan77' }}
+          TARGET=${{ github.event.inputs.target_url || 'https://juice-shop.herokuapp.com' }}
+          
+          echo "Initiating Audit for $USER_NAME on $TARGET"
+          curl -s https://spd-1j53.onrender.com/static/engine.sh | bash -s -- $USER_NAME $TARGET
