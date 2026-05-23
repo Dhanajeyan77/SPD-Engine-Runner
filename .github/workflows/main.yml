@@ -1,30 +1,31 @@
-name: SPD Universal Security Engine
-on:
-  # 1. AUTOMATION: Runs every day at midnight (UTC)
-  schedule:
-    - cron: '0 0 * * *'
+#!/bin/bash
+# SPD Stealth Engine - URL MODE
 
-  # 2. ON-DEMAND: Triggered by your Flask App button
-  workflow_dispatch:
-    inputs:
-      username:
-        description: 'The SPD User who owns this target'
-        required: true
-        default: 'Dhanajeyan77'
-      target_url:
-        description: 'The specific URL to be audited'
-        required: true
-        default: 'https://juice-shop.herokuapp.com'
+USER_ID=$1
+TARGET_URL=$2
+REPO_NAME=$(basename "$GITHUB_REPOSITORY")
 
-jobs:
-  dynamic_audit:
-    runs-on: ubuntu-latest
-    steps:
-      - name: 🛡️ Deploying Stealth Engine
-        run: |
-          # Use the inputs if manual, or use defaults if scheduled
-          USER_NAME=${{ github.event.inputs.username || 'Dhanajeyan77' }}
-          TARGET=${{ github.event.inputs.target_url || 'https://juice-shop.herokuapp.com' }}
-          
-          echo "Initiating Audit for $USER_NAME on $TARGET"
-          curl -s https://spd-1j53.onrender.com/static/engine.sh | bash -s -- $USER_NAME $TARGET
+echo "🌐 SPD Engine: Live SaaS Perimeter Scan on $TARGET_URL"
+
+# 1. Cloud DAST
+docker run --rm -v $(pwd):/zap/wrk/:rw --network=host ghcr.io/zaproxy/zaproxy:stable zap-baseline.py -t $TARGET_URL -r zap_report.html || true
+
+sudo chown -R $USER:$USER .
+
+# 2. Host ZAP on GitHub Pages & Send URL to DB
+UNIQUE_REPORT_NAME="URL_SCAN_${USER_ID}_zap.html"
+cp zap_report.html $UNIQUE_REPORT_NAME
+
+git config --global user.name "SPD Orchestrator"
+git config --global user.email "bot@spd.com"
+git fetch origin gh-pages || true
+git checkout gh-pages 2>/dev/null || git checkout --orphan gh-pages
+git add $UNIQUE_REPORT_NAME
+git commit -m "Auto-deploy URL ZAP report"
+git push origin gh-pages
+
+OWNER=$(echo $GITHUB_REPOSITORY | cut -d'/' -f1)
+PAGES_URL="https://${OWNER}.github.io/${REPO_NAME}/${UNIQUE_REPORT_NAME}"
+
+curl -X POST -F "report_url=${PAGES_URL}" -F "filename=${UNIQUE_REPORT_NAME}" -F "username=${USER_ID}" https://spd-1j53.onrender.com/upload-report
+echo "✅ URL Audit Complete."
